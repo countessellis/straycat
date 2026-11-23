@@ -18,6 +18,7 @@ impl fmt::Display for Help {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     let details: Vec<String> = vec![
       format!("  --mode <MODE>                        Mode to run in (default: {}, choices: {})",DEFAULT_MODE,MODE_LIST.join(", ")),
+      format!("  --target <MODE>                      Target to connect to, either a URL or a hostname:port pair."),
       format!("  --help                               Display this help message"),
     ];
     let fields: Fields = Fields::new(&HashMap::from([
