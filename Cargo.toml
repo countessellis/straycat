@@ -1,0 +1,40 @@
+[package]
+name = "straycat"
+license = "MIT"
+authors = ["Bethany Davis <ellis@despoena.com>"]
+description = "An network and protocol troubleshooting utility in the spirit of netcat but with wider application."
+repository = "https://github.com/countessellis/straycat"
+version = "0.1.0"
+edition = "2024"
+default-run = "straycat"
+
+[lib]
+name = "straycat"
+path = "src/lib.rs"
+
+[dependencies]
+env_logger = "0.11"
+log = "0.4"
+mimalloc = "0.1"
+nu-ansi-term = "0.50"
+regex = "1.13"
+openssl = { version = "0.10", features = ["vendored"] }
+tungstenite = { version = "0.30", features = ["native-tls-vendored"] }
+url = "2.5"
+
+[build-dependencies]
+chrono = "0.4"
+
+[profile.dev]
+opt-level = 1
+debug = true
+
+[profile.release]
+opt-level = 3
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
+debug-assertions = false
+overflow-checks = false
+package."*".opt-level = "s"
