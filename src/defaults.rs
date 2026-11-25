@@ -34,9 +34,11 @@ pub(crate) const DEFAULT_LOG_NO_DEBUG_MODULES: &[&str] = &[
 ];
 
 // Stray Cat Defaults:
-pub(crate) const DEFAULT_MODE: &str = "batch";
-pub(crate) const MODE_LIST:    &[&str] = &[ "batch","interactive","help"];
-pub(crate) const DEFAULT_WAIT: u64  = 3;
+pub(crate) const DEFAULT_MODE:          &str = "batch";
+pub(crate) const MODE_LIST:             &[&str] = &[ "batch","interactive","help"];
+pub(crate) const DEFAULT_WAIT:          u64  = 3;
+pub(crate) const DEFAULT_STRAY_VERBOSE: bool = false;
+pub(crate) const DEFAULT_STRAY_PRETTY:  bool = false;
 
 // Splash:
 pub(crate) const SPLASH_COLOUR: u8    = 95;

@@ -27,6 +27,7 @@ pub struct StrayWebSocket;
 
 impl StrayWebSocket {
   pub(crate) fn connect_ws(cfg: &WsConfig) -> Result<WebSocket<StrayStream>, Box<dyn std::error::Error>> {
+    log::info!("Capturing a stray websocket at {}.",cfg.url);
     let mut request = cfg.url.as_str().into_client_request()?;
     for (key,value) in &cfg.headers {
       let name = HeaderName::from_bytes(key.as_bytes())?;

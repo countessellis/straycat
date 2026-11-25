@@ -19,6 +19,9 @@ impl fmt::Display for Help {
     let details: Vec<String> = vec![
       format!("  --mode <MODE>                        Mode to run in (default: {}, choices: {})",DEFAULT_MODE,MODE_LIST.join(", ")),
       format!("  --target <MODE>                      Target to connect to, either a URL or a hostname:port pair."),
+      format!("  --pretty <MODE>                      Enable pretty print of JSON coming from target (default: {})",DEFAULT_STRAY_PRETTY),
+      format!("  --verbose <true/false>               Enable or disable logging (default: {})",DEFAULT_LOG_VERBOSE),
+      format!("  --debug <true/false>                 Enable or disable debug level logging (default: {})",DEFAULT_LOG_DEBUG),
       format!("  --help                               Display this help message"),
     ];
     let fields: Fields = Fields::new(&HashMap::from([
