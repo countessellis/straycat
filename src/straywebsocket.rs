@@ -1,7 +1,5 @@
-use openssl::ssl::SslStream;
 use std::{
-  io::{self, BufRead, ErrorKind, Read, Write},
-  net::TcpStream,
+  io::{self, BufRead, ErrorKind, Write},
   sync::mpsc,
   thread,
   time::Duration,
@@ -15,56 +13,20 @@ use tungstenite::{
   WebSocket,
 };
 
-use super::StrayCat;
+use crate::straystream::StrayStream;
 
 pub struct WsConfig {
-  pub url: String,
+  pub url:     String,
   pub headers: Vec<(String, String)>,
-  pub binary: bool,
+  pub binary:  bool,
   pub verbose: bool,
+  pub pretty:  bool,
 }
 
-pub enum WsStream {
-  Plain(TcpStream),
-  Tls(SslStream<TcpStream>),
-}
+pub struct StrayWebSocket;
 
-impl WsStream {
-  fn set_read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
-    match self {
-      WsStream::Plain(stream) => stream.set_read_timeout(timeout),
-      WsStream::Tls(stream) => stream.get_ref().set_read_timeout(timeout),
-    }
-  }
-}
-
-impl Read for WsStream {
-  fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-    match self {
-      WsStream::Plain(stream) => stream.read(buf),
-      WsStream::Tls(stream) => stream.read(buf),
-    }
-  }
-}
-
-impl Write for WsStream {
-  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-    match self {
-      WsStream::Plain(stream) => stream.write(buf),
-      WsStream::Tls(stream) => stream.write(buf),
-    }
-  }
-
-  fn flush(&mut self) -> io::Result<()> {
-    match self {
-      WsStream::Plain(stream) => stream.flush(),
-      WsStream::Tls(stream) => stream.flush(),
-    }
-  }
-}
-
-impl StrayCat {
-  pub(super) fn connect_ws(cfg: &WsConfig) -> Result<WebSocket<WsStream>, Box<dyn std::error::Error>> {
+impl StrayWebSocket {
+  pub(crate) fn connect_ws(cfg: &WsConfig) -> Result<WebSocket<StrayStream>, Box<dyn std::error::Error>> {
     let mut request = cfg.url.as_str().into_client_request()?;
     for (key,value) in &cfg.headers {
       let name = HeaderName::from_bytes(key.as_bytes())?;
@@ -74,20 +36,18 @@ impl StrayCat {
     let uri = request.uri();
     let host = uri.host().ok_or("Missing host in WebSocket URL")?;
     let scheme = uri.scheme_str().unwrap_or("ws");
-    let stream = match scheme {
-      "ws" => {
-        let port = uri.port_u16().unwrap_or(80);
-        let tcp = TcpStream::connect((host, port))?;
-        WsStream::Plain(tcp)
-      },
-      "wss" => {
-        return Err("wss:// TLS support is not implemented yet".into());
-      },
-      other => {
-        return Err(format!("Unsupported URL scheme: {other}").into());
-      },
+    let (port, secure) = match scheme {
+      "ws"  => (uri.port_u16().unwrap_or(80), false),
+      "wss" => (uri.port_u16().unwrap_or(443), true),
+      other => return Err(format!("Unsupported URL scheme: {other}").into()),
     };
-    let (ws, response) = client(request, stream)?;
+    let target = host.trim_matches(&['[', ']'][..]);
+    let stream = StrayStream::connect(target,port,secure)?;
+    log::info!("Connected: {stream}");
+    if cfg.verbose {
+      eprintln!("Connected: {stream}");
+    }
+    let (ws,response) = client(request,stream)?;
     if cfg.verbose {
       eprintln!("HTTP/1.1 {}",response.status());
       for (key,value) in response.headers() {
@@ -97,7 +57,7 @@ impl StrayCat {
     Ok(ws)
   }
   
-  pub(super) fn run_ws(cfg: &WsConfig) -> Result<(), Box<dyn std::error::Error>> {
+  pub(crate) fn run_ws(cfg: &WsConfig) -> Result<(), Box<dyn std::error::Error>> {
     let mut socket = Self::connect_ws(&cfg)?;
     socket.get_ref().set_read_timeout(Some(Duration::from_millis(20)))?;
     let (tx, rx) = mpsc::channel::<Vec<u8>>();
@@ -119,10 +79,16 @@ impl StrayCat {
         } else {
           Message::Text(String::from_utf8_lossy(&bytes).into_owned().into())
         };
-      socket.send(msg)?;
+        socket.send(msg)?;
       }
       match socket.read() {
-        Ok(Message::Text(text)) => println!("{text}"),
+        Ok(Message::Text(text)) => {
+          if cfg.pretty {
+            println!("{}",Self::format_json_stream(&text));
+          } else {
+            println!("{text}");
+          }
+        },
         Ok(Message::Binary(data)) => {
           let mut stdout = io::stdout().lock();
           stdout.write_all(&data)?;
@@ -135,5 +101,17 @@ impl StrayCat {
       }
     }
     Ok(())
+  }
+
+  fn format_json_stream(raw: &str) -> String {
+    let stream = serde_json::Deserializer::from_str(raw).into_iter::<serde_json::Value>();
+    let mut out = Vec::new();
+    for item in stream {
+      match item {
+        Ok(val) => out.push(serde_json::to_string_pretty(&val).unwrap_or_default()),
+        Err(_) => return raw.to_string(),
+      }
+    }
+    if out.is_empty() { raw.to_string() } else { out.join("\n") }
   }
 }

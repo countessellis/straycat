@@ -66,14 +66,14 @@ pub fn init() {
       "--verbose" => match args.next() {
         Some(value) => match value.parse::<bool>() {
           Ok(value) => verbose = value,
-          Err(err)  => {},
+          Err(_)  => {},
         },
         None        => {},
       },
       "--debug" => match args.next() {
         Some(value) => match value.parse::<bool>() {
           Ok(value) => debug = value,
-          Err(err)  => {},
+          Err(_)  => {},
         },
         None        => {},
       },

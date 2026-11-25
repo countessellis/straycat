@@ -1,10 +1,7 @@
 use std::{
-  fs,
   thread,
   time::Duration,
 };
-
-use crate::collections::Config;
 
 use super::StrayCat;
 
