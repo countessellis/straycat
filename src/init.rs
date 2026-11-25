@@ -10,6 +10,7 @@ use crate::version::*;
 ///////////// Run
 
 pub fn run() {
+  log::info!("{}",splash());
   log::info!("{}",version());
   let config: Config = config::init();
   log::info!("{}",config);

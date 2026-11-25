@@ -17,7 +17,7 @@ pub(crate) const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 pub(crate) const LICENSE:    &str = env!("CARGO_PKG_LICENSE");
 
 // Logging Constants:
-pub(crate) const DEFAULT_LOG_LEVEL:            LevelFilter                                 = LevelFilter::Debug; // LevelFilter::Info;
+pub(crate) const DEFAULT_LOG_LEVEL:            LevelFilter                                 = LevelFilter::Info;
 pub(crate) const DEFAULT_LOG_FORMAT_TIMESTAMP: Option<env_logger::fmt::TimestampPrecision> = Some(TimestampPrecision::Millis); // None;
 pub(crate) const DEFAULT_LOG_FORMAT_LEVEL:     bool                                        = true; // false;
 pub(crate) const DEFAULT_LOG_FORMAT_TARGET:    bool                                        = true; // false;
@@ -25,6 +25,8 @@ pub(crate) const DEFAULT_LOG_DIR:              &'static str                     
 pub(crate) const DEFAULT_LOG_FILE:             &'static str                                = "straycat.log";
 pub(crate) const DEFAULT_LOG_TARGET:           LogTarget                                   = LogTarget::Stdout;
 //pub(crate) const DEFAULT_LOG_TARGET:           LogTarget                                   = LogTarget::File(DEFAULT_LOG_DIR, DEFAULT_LOG_FILE);
+pub(crate) const DEFAULT_LOG_VERBOSE:          bool                                        = false;
+pub(crate) const DEFAULT_LOG_DEBUG:            bool                                        = false;
 
 pub(crate) const DEFAULT_LOG_NO_DEBUG_MODULES: &[&str] = &[
   "ureq",
@@ -37,7 +39,7 @@ pub(crate) const MODE_LIST:    &[&str] = &[ "batch","interactive","help"];
 pub(crate) const DEFAULT_WAIT: u64  = 3;
 
 // Splash:
-pub(crate) const SPLASH_COLOUR: u8    = 139;
+pub(crate) const SPLASH_COLOUR: u8    = 95;
 pub(crate) const SPLASH_TXT:    &str  = include_str!("../resources/straycat.txt");
 
 // Includes:

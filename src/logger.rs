@@ -1,10 +1,12 @@
-use log::{LevelFilter,Level};
-use std::str::FromStr;
-use std::io::Write;
 use env_logger::TimestampPrecision;
-use std::fs::create_dir_all;
-use std::path::PathBuf;
-use std::fs::OpenOptions;
+use log::{LevelFilter,Level};
+use std::{
+  env::{args,Args},
+  fs::{create_dir_all,OpenOptions},
+  io::Write,
+  path::PathBuf,
+  str::FromStr,
+};
 
 use crate::defaults::*;
 use crate::splash::*;
@@ -55,13 +57,38 @@ impl LogTarget {
 }
 
 pub fn init() {
-  let loglevel: LevelFilter = match std::env::var("RUST_LOG") {
+
+  let mut verbose: bool = DEFAULT_LOG_VERBOSE;
+  let mut debug:   bool = DEFAULT_LOG_DEBUG;
+  let mut args: Args = args();
+  while let Some(arg) = args.next() {
+    match arg.as_str() {
+      "--verbose" => match args.next() {
+        Some(value) => match value.parse::<bool>() {
+          Ok(value) => verbose = value,
+          Err(err)  => {},
+        },
+        None        => {},
+      },
+      "--debug" => match args.next() {
+        Some(value) => match value.parse::<bool>() {
+          Ok(value) => debug = value,
+          Err(err)  => {},
+        },
+        None        => {},
+      },
+      _ => {},
+    }
+  }
+
+  let mut loglevel: LevelFilter = match std::env::var("RUST_LOG") {
     Ok(level) => match Level::from_str(level.as_str()) {
       Ok(level) => level.to_level_filter(),
       Err(_)    => DEFAULT_LOG_LEVEL,
     },
     Err(_)    => DEFAULT_LOG_LEVEL,
   };
+  if debug { loglevel = LevelFilter::Debug; verbose = true }
 
   let mut builder = env_logger::Builder::from_default_env();
   builder
@@ -94,6 +121,6 @@ pub fn init() {
   for &module in DEFAULT_LOG_NO_DEBUG_MODULES {
     builder.filter_module(module,log::LevelFilter::Info);
   }
-  builder.init();
+  if verbose { builder.init(); }
 }
 
