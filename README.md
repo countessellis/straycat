@@ -16,6 +16,7 @@ Currently, only text based interaction with a websocket is implemented.
 
 ## Usage
 
+```
 Usage: straycat [(OPTIONS)]
 
   An network and protocol troubleshooting utility in the spirit of netcat but with wider application.
@@ -30,6 +31,7 @@ Options:
   --verbose <true/false>               Enable or disable logging (default: false)
   --debug <true/false>                 Enable or disable debug level logging (default: false)
   --help | -h                          Display this help message
+```
 
 ---
 ---
