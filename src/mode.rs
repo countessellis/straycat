@@ -51,7 +51,7 @@ impl Mode {
           None        => {},
         },
         "--interactive"  => return Mode::Interactive,
-        "--help" => return Mode::Help,
+        "--help"|"-h" => return Mode::Help,
         _ => {},
       }
     }

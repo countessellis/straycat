@@ -12,6 +12,17 @@ impl StrayCat {
       target if target.starts_with("ws://")|target.starts_with("wss://") => {
         let config: WsConfig = WsConfig {
           url: target.to_string(),
+          source: {
+            let mut addr: String = self.config.get("source_addr");
+            let port: String = self.config.get("source_port");
+            if addr.contains("::") { addr = format!("[{}]",addr); }
+            match (addr.is_empty(),port.is_empty()) {
+              (false,false) => Some(format!("{}:{}",addr,port)),
+              (true,false) => Some(format!("0.0.0.0:{}",port)),
+              (false,true) => Some(format!("{}:0",addr)),
+              _            => None,
+            }
+          },
           headers: Vec::new(),
           binary: false,
           verbose: {

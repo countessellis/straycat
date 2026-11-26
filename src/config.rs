@@ -15,8 +15,13 @@ pub(crate) fn init() -> Config {
       ("pretty".to_string(),DEFAULT_STRAY_PRETTY.to_string()),
     ]),
     file: None,
-    ignore: Vec::new(),
+    ignore: vec![
+      "--interactive".to_string(),
+      "--help".to_string(),
+    ],
     flags: HashMap::from([
+      ("-p".to_string(),ConfigFlag::new("source_port",true,None)),
+      ("-s".to_string(),ConfigFlag::new("source_addr",true,None)),
       ("-v".to_string(),ConfigFlag::new("stray_verbose",false,Some("true"))),
     ]),
   };

@@ -17,6 +17,7 @@ use crate::straystream::StrayStream;
 
 pub struct WsConfig {
   pub url:     String,
+  pub source:  Option<String>,
   pub headers: Vec<(String, String)>,
   pub binary:  bool,
   pub verbose: bool,
@@ -43,7 +44,7 @@ impl StrayWebSocket {
       other => return Err(format!("Unsupported URL scheme: {other}").into()),
     };
     let target = host.trim_matches(&['[', ']'][..]);
-    let stream = StrayStream::connect(target,port,secure)?;
+    let stream: StrayStream = StrayStream::connect(target,&cfg.source,port,secure)?;
     log::info!("Connected: {stream}");
     if cfg.verbose {
       eprintln!("Connected: {stream}");

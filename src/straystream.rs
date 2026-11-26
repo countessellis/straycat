@@ -2,11 +2,11 @@ use openssl::{
   ssl::{NameType,SslConnector,SslMethod,SslStream,SslVerifyMode},
   x509::{X509,X509VerifyResult},
 };
+use socket2::{Domain, Protocol, Socket, Type};
 use std::{
   fmt,
   io::{self,Read,Write},
-  net::SocketAddr,
-  net::TcpStream,
+  net::{SocketAddr, TcpStream, ToSocketAddrs},
   time::Duration,
 };
 
@@ -73,8 +73,19 @@ impl fmt::Display for StrayStream {
 }
 
 impl StrayStream {
-  pub fn connect(target: &str, port: u16, secure: bool) -> Result<StrayStream,Box<dyn std::error::Error>> {
-    let tcp_stream = TcpStream::connect((target,port))?;
+  pub fn connect(target: &str, source: &Option<String>, port: u16, secure: bool) -> Result<StrayStream,Box<dyn std::error::Error>> {
+    let tcp_stream = if let Some(source) = source {
+      let local_addr: SocketAddr = source.parse()?;
+      let remote_addr = (target,port).to_socket_addrs()?.find(|addr| addr.is_ipv4() == local_addr.is_ipv4()).ok_or("No matching IPv4/IPv6 remote address found for source address")?;
+      let domain = Domain::for_address(local_addr);
+      let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))?;
+      socket.set_reuse_address(true)?;
+      socket.bind(&local_addr.into())?;
+      socket.connect(&remote_addr.into())?;
+      socket.into()
+    } else {
+      TcpStream::connect((target, port))?
+    };
     if secure {
       let mut builder = SslConnector::builder(SslMethod::tls())?;
       builder.set_verify(SslVerifyMode::NONE);
