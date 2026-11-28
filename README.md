@@ -36,6 +36,7 @@ Options:
   --verbose <true/false>               Enable or disable logging (default: false)
   --debug <true/false>                 Enable or disable debug level logging (default: false)
   --help | -h                          Display this help message
+  --version | -V                       Display version
 ```
 
 ---

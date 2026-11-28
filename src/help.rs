@@ -30,6 +30,7 @@ impl fmt::Display for Help {
       format!("  --verbose <true/false>               Enable or disable logging (default: {})",DEFAULT_LOG_VERBOSE),
       format!("  --debug <true/false>                 Enable or disable debug level logging (default: {})",DEFAULT_LOG_DEBUG),
       format!("  --help | -h                          Display this help message"),
+      format!("  --version | -V                       Display version"),
     ];
     let fields: Fields = Fields::new(&HashMap::from([
       ("RUNAS",self.config.get("ranas")),
