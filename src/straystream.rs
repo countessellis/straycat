@@ -6,13 +6,15 @@ use openssl::{
 use std::{
   fmt,
   io::{self,ErrorKind,Read,Write},
-  net::{SocketAddr,TcpStream},
+  net::{Shutdown,SocketAddr,TcpStream},
+  sync::{Arc,Mutex},
   thread,
   time::Duration,
 };
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
 
+use crate::straycmd::StrayCmd;
 use crate::strayconfig::StrayConfig;
 use crate::straysocket::StraySocket;
 
@@ -160,50 +162,122 @@ impl StrayStream {
     let _ = stream.set_nodelay(true);
     stream.set_read_timeout(Some(Duration::from_millis(20)))?;
     let (tx,rx) = unbounded::<Vec<u8>>();
-    thread::spawn({
-      let crlf = cfg.crlf;
-      move || {
-        let mut stdin = io::stdin().lock();
-        let mut in_buf = [0u8; 4096];
+    if cfg.execute.is_some() {
+      if let Some(mut child) = StrayCmd::connect(&cfg) && let (Some(mut child_stdin),Some(mut child_stdout),Some(mut child_stderr)) = (child.stdin.take(),child.stdout.take(),child.stderr.take()) {
+        stream.set_read_timeout(Some(Duration::from_millis(15)))?;
+        let stream = Arc::new(Mutex::new(stream));
+        let stream_in = Arc::clone(&stream);
+        let in_handle = thread::spawn(move || -> io::Result<()> {
+          let mut buf = [0u8; 8192];
+          loop {
+            let read_res = {
+              let mut guard = stream_in.lock().unwrap();
+              guard.read(&mut buf)
+            };
+            match read_res {
+              Ok(0) => break,
+              Ok(n) => {
+                child_stdin.write_all(&buf[..n])?;
+                child_stdin.flush()?;
+              },
+              Err(e) if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
+                thread::sleep(Duration::from_millis(1));
+                continue;
+              },
+              Err(e) => return Err(e),
+            }
+          }
+          drop(child_stdin);
+          Ok(())
+        });
+        let stream_out = Arc::clone(&stream);
+        let out_handle = thread::spawn(move || -> io::Result<()> {
+        let mut buf = [0u8; 8192];
         loop {
-          match stdin.read(&mut in_buf) {
-            Ok(0) | Err(_) => break,
-            Ok(n) => {
-              let data = if crlf {
-                let mut out = Vec::with_capacity(n + 16);
-                for &b in &in_buf[..n] {
-                  if b == b'\n' && out.last() != Some(&b'\r') {
-                    out.push(b'\r');
+          let n = child_stdout.read(&mut buf)?;
+            if n == 0 {
+              break;
+            }
+            let mut guard = stream_out.lock().unwrap();
+            guard.write_all(&buf[..n])?;
+            guard.flush()?;
+          }
+          Ok(())
+        });
+        let stream_err = Arc::clone(&stream);
+        let err_handle = thread::spawn(move || -> io::Result<()> {
+          let mut buf = [0u8; 8192];
+          loop {
+            let n = child_stderr.read(&mut buf)?;
+            if n == 0 {
+              break;
+            }
+            let mut guard = stream_err.lock().unwrap();
+            guard.write_all(&buf[..n])?;
+            guard.flush()?;
+          }
+          Ok(())
+        });
+        let _ = out_handle.join();
+        let _ = err_handle.join();
+        if let Ok(mut guard) = stream.lock() {
+          let _ = guard.shutdown(Shutdown::Write);
+        }
+        let _ = in_handle.join();
+        let _ = child.wait();
+      } else {
+        if let Some(ref execute) = cfg.execute {
+          return Err(format!("Failed to spawn command: '{}'",execute).into());
+        } else {
+          return Err(format!("Failed to spawn command").into());
+        }
+      }
+    } else {
+      thread::spawn({
+        let cfg = cfg.clone();
+        move || {
+          let mut stdin = io::stdin().lock();
+          let mut in_buf = [0u8; 4096];
+          loop {
+            match stdin.read(&mut in_buf) {
+              Ok(0) | Err(_) => break,
+              Ok(n) => {
+                let data = if cfg.crlf {
+                  let mut out = Vec::with_capacity(n + 16);
+                  for &b in &in_buf[..n] {
+                    if b == b'\n' && out.last() != Some(&b'\r') {
+                      out.push(b'\r');
+                    }
+                    out.push(b);
                   }
-                  out.push(b);
+                  out
+                } else {
+                  in_buf[..n].to_vec()
+                };
+                if tx.send(data).is_err() {
+                  break;
                 }
-                out
-              } else {
-                in_buf[..n].to_vec()
-              };
-              if tx.send(data).is_err() {
-                break;
-              }
-            },
+              },
+            }
           }
         }
-      }
-    });
-    let mut buf = [0u8; 4096];
-    loop {
-      while let Ok(bytes) = rx.try_recv() {
-        stream.write_all(&bytes)?;
-        stream.flush()?;
-      }
-      match stream.read(&mut buf) {
-        Ok(0) => break,
-        Ok(n) => {
-          let mut stdout = io::stdout().lock();
-          stdout.write_all(&buf[..n])?;
-          stdout.flush()?;
+      });
+      let mut buf = [0u8; 4096];
+      loop {
+        while let Ok(bytes) = rx.try_recv() {
+          stream.write_all(&bytes)?;
+          stream.flush()?;
         }
-        Err(ref err) if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::TimedOut => {}
-        Err(err) => return Err(err.into()),
+        match stream.read(&mut buf) {
+          Ok(0) => break,
+          Ok(n) => {
+            let mut stdout = io::stdout().lock();
+            stdout.write_all(&buf[..n])?;
+            stdout.flush()?;
+          }
+          Err(ref err) if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::TimedOut => {}
+          Err(err) => return Err(err.into()),
+        }
       }
     }
     Ok(())
@@ -309,5 +383,26 @@ impl StrayStream {
       write!(f, ", alpn={}", String::from_utf8_lossy(alpn))?;
     }
     write!(f, "]")
+  }
+
+  pub fn shutdown(&mut self, how: Shutdown) -> io::Result<()> {
+    match self {
+      StrayStream::Tcp(stream) => stream.shutdown(how),
+      StrayStream::Tls(stream) => {
+        if matches!(how, Shutdown::Write | Shutdown::Both) {
+          let _ = stream.shutdown();
+        }
+        stream.get_ref().shutdown(how)
+      },
+      #[cfg(unix)]
+      StrayStream::Unix(s) => s.shutdown(how),
+      #[cfg(unix)]
+      StrayStream::UnixTls(s) => {
+        if matches!(how, Shutdown::Write | Shutdown::Both) {
+          let _ = s.shutdown();
+        }
+        s.get_ref().shutdown(how)
+      }
+    }
   }
 }

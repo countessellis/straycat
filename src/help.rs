@@ -20,6 +20,7 @@ impl fmt::Display for Help {
       format!("  -4                                   Use IPv4 addresses only."),
       format!("  -6                                   Use IPv6 addresses only."),
       format!("  -C                                   Send CRLF as line-ending."),
+      format!("  -e <command>                         Execute a command (with no arguments) and connect it to the connection."),
       format!("  -l                                   Listen for an incoming connection rather than initiating a connection to a remote host."),
       format!("  -p <PORT>                            Specify the source port, 0-65536."),
       format!("  -s <ADDR>                            Specify the source IP, in IPv4 or IPv6."),

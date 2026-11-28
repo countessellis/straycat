@@ -26,6 +26,7 @@ Options:
   -4                                   Use IPv4 addresses only.
   -6                                   Use IPv6 addresses only.
   -C                                   Send CRLF as line-ending.
+  -e <command>                         Execute a command (with no arguments) and connect it to the connection.
   -l                                   Listen for an incoming connection rather than initiating a connection to a remote host.
   -p <PORT>                            Specify the source port, 0-65536.
   -s <ADDR>                            Specify the source IP, in IPv4 or IPv6.

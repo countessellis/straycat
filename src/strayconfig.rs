@@ -9,6 +9,7 @@ use crate::defaults::*;
 
 ///////////// StrayWebSocketConfig
 
+#[derive(Debug,Clone)]
 pub struct StrayConfig {
   pub target:     String,
   pub url:        String,
@@ -18,6 +19,7 @@ pub struct StrayConfig {
   pub unix:       Option<String>,
   pub secure:     bool,
   pub listen:     bool,
+  pub execute:    Option<String>,
   pub headers:    Vec<(String, String)>,
   pub binary:     bool,
   pub crlf:       bool,
@@ -43,6 +45,7 @@ impl fmt::Display for StrayConfig {
     Unix:       {}
     Secure:     {}
     Listen:     {}
+    Execute:    {}
     Binary:     {}
     CRLF:       {}
     Verbose:    {}
@@ -59,10 +62,11 @@ impl fmt::Display for StrayConfig {
   self.url,
   self.port,
   self.ip_version,
-  match self.source { Some(ref source) => source.as_str(), None => "Default" },
-  match self.unix   { Some(ref unix)   => unix.as_str(),   None => "Default" },
+  match self.source  { Some(ref source)  => source.as_str(),  None => "Default" },
+  match self.unix    { Some(ref unix)    => unix.as_str(),    None => "None" },
   self.secure,
   self.listen,
+  match self.execute { Some(ref execute) => execute.as_str(), None => "None" },
   self.binary,
   self.crlf,
   self.verbose,
@@ -145,6 +149,16 @@ impl StrayConfig {
       listen: {
         let listen: String = config.get("stray_listen");
         listen.to_lowercase().parse::<bool>().unwrap_or(DEFAULT_STRAY_LISTEN)
+      },
+      execute: {
+        let mut execute: String = config.get("stray_exec");
+        log::debug!("execute: {}",execute);
+        if !execute.is_empty() {
+          if let Some(idx) = execute.find(' ') {
+            execute.truncate(idx);
+          }
+          Some(execute)
+        } else { None }
       },
       headers: Vec::new(),
       binary: false,

@@ -31,6 +31,7 @@ pub(crate) fn init() -> Config {
       ("-4".to_string(),ConfigFlag::new("stray_ip_version",false,Some("4"))),
       ("-6".to_string(),ConfigFlag::new("stray_ip_version",false,Some("6"))),
       ("-C".to_string(),ConfigFlag::new("crlf",false,Some("true"))),
+      ("-e".to_string(),ConfigFlag::new("stray_exec",true,None)),
       ("-l".to_string(),ConfigFlag::new("stray_listen",false,Some("true"))),
       ("-p".to_string(),ConfigFlag::new("source_port",true,None)),
       ("-s".to_string(),ConfigFlag::new("source_addr",true,None)),
