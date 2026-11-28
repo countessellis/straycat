@@ -39,6 +39,8 @@ pub(crate) const MODE_LIST:             &[&str] = &[ "batch","interactive","help
 pub(crate) const DEFAULT_WAIT:          u64  = 3;
 pub(crate) const DEFAULT_STRAY_VERBOSE: bool = false;
 pub(crate) const DEFAULT_STRAY_PRETTY:  bool = false;
+pub(crate) const DEFAULT_STRAY_SECURE:  bool = false;
+pub(crate) const DEFAULT_STRAY_CRLF:    bool = false;
 
 // Splash:
 pub(crate) const SPLASH_COLOUR: u8    = 95;

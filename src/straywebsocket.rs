@@ -1,6 +1,6 @@
+use crossbeam_channel::unbounded;
 use std::{
   io::{self, BufRead, ErrorKind, Write},
-  sync::mpsc,
   thread,
   time::Duration,
 };
@@ -15,39 +15,25 @@ use tungstenite::{
 
 use crate::straystream::StrayStream;
 
-pub struct WsConfig {
-  pub url:     String,
-  pub source:  Option<String>,
-  pub headers: Vec<(String, String)>,
-  pub binary:  bool,
-  pub verbose: bool,
-  pub pretty:  bool,
-}
+use crate::strayconfig::*;
+
+///////////// StrayWebSocket
 
 pub struct StrayWebSocket;
 
 impl StrayWebSocket {
-  pub(crate) fn connect_ws(cfg: &WsConfig) -> Result<WebSocket<StrayStream>, Box<dyn std::error::Error>> {
-    log::info!("Capturing a stray websocket at {}.",cfg.url);
+  pub(crate) fn connect(cfg: &StrayConfig) -> Result<WebSocket<StrayStream>, Box<dyn std::error::Error>> {
+    log::info!("Capturing a stray websocket at {}.",cfg.target);
     let mut request = cfg.url.as_str().into_client_request()?;
     for (key,value) in &cfg.headers {
       let name = HeaderName::from_bytes(key.as_bytes())?;
       let value = HeaderValue::from_str(value)?;
       request.headers_mut().append(name,value);
     }
-    let uri = request.uri();
-    let host = uri.host().ok_or("Missing host in WebSocket URL")?;
-    let scheme = uri.scheme_str().unwrap_or("ws");
-    let (port, secure) = match scheme {
-      "ws"  => (uri.port_u16().unwrap_or(80), false),
-      "wss" => (uri.port_u16().unwrap_or(443), true),
-      other => return Err(format!("Unsupported URL scheme: {other}").into()),
-    };
-    let target = host.trim_matches(&['[', ']'][..]);
-    let stream: StrayStream = StrayStream::connect(target,&cfg.source,port,secure)?;
-    log::info!("Connected: {stream}");
+    let stream: StrayStream = StrayStream::connect(&cfg)?;
+    log::info!("Connected: {}",stream);
     if cfg.verbose {
-      eprintln!("Connected: {stream}");
+      eprintln!("Connected: {}",stream);
     }
     let (ws,response) = client(request,stream)?;
     if cfg.verbose {
@@ -59,10 +45,11 @@ impl StrayWebSocket {
     Ok(ws)
   }
   
-  pub(crate) fn run_ws(cfg: &WsConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let mut socket = Self::connect_ws(&cfg)?;
+  pub(crate) fn run(cfg: &StrayConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let mut socket = Self::connect(&cfg)?;
+    log::info!("Playing with a stray websocket.");
     socket.get_ref().set_read_timeout(Some(Duration::from_millis(20)))?;
-    let (tx, rx) = mpsc::channel::<Vec<u8>>();
+    let (tx,rx) = unbounded::<Vec<u8>>();
     thread::spawn(move || {
       let stdin = io::stdin();
       for line in stdin.lock().lines() {

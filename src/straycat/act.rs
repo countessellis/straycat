@@ -1,45 +1,44 @@
 use super::StrayCat;
-use crate::straywebsocket::{StrayWebSocket,WsConfig};
 
-use crate::defaults::*;
+use crate::strayconfig::StrayConfig;
+use crate::straystream::StrayStream;
+use crate::straywebserver::StrayWebServer;
+use crate::straywebsocket::StrayWebSocket;
 
 ///////////// StrayCat
 
 impl StrayCat {
   pub fn act(&self) {
-    let target: String = self.config.get("target");
-    match target.as_str() {
+    let config: StrayConfig = StrayConfig::from_config(&self.config);
+    log::debug!("{}",config);
+    match config.url.as_str() {
       target if target.starts_with("ws://")|target.starts_with("wss://") => {
-        let config: WsConfig = WsConfig {
-          url: target.to_string(),
-          source: {
-            let mut addr: String = self.config.get("source_addr");
-            let port: String = self.config.get("source_port");
-            if addr.contains("::") { addr = format!("[{}]",addr); }
-            match (addr.is_empty(),port.is_empty()) {
-              (false,false) => Some(format!("{}:{}",addr,port)),
-              (true,false) => Some(format!("0.0.0.0:{}",port)),
-              (false,true) => Some(format!("{}:0",addr)),
-              _            => None,
-            }
-          },
-          headers: Vec::new(),
-          binary: false,
-          verbose: {
-            let verbose: String = self.config.get("stray_verbose");
-            verbose.to_lowercase().parse::<bool>().unwrap_or(DEFAULT_STRAY_VERBOSE)
-          },
-          pretty: {
-            let verbose: String = self.config.get("pretty");
-            verbose.to_lowercase().parse::<bool>().unwrap_or(DEFAULT_STRAY_VERBOSE)
-          },
-        };
-        match StrayWebSocket::run_ws(&config) {
+        match StrayWebSocket::run(&config) {
           Ok(()) => {},
-          Err(err) => log::error!("Failed to test websocket: {}",err),
+          Err(err) => {
+            log::error!("Failed to capture a stray websocket at {}: {}",config.url,err);
+            eprintln!("Failed to capture a stray websocket at {}: {}",config.url,err);
+          },
         }
       },
+      target if target.starts_with("http://") || target.starts_with("https://") => {
+        match StrayWebServer::run(&config) {
+          Ok(()) => {},
+          Err(err) => {
+            log::error!("Failed to capture a stray webserver at {}: {}",config.url,err);
+            eprintln!("Failed to capture a stray webserver at {}: {}",config.url,err);
+          },
+        }
+      },
+      target if target.contains("://") => {},
       _ => {
+        match StrayStream::run(&config) {
+          Ok(()) => {},
+          Err(err) => {
+            log::error!("Failed to capture a stray stream at {}:{}: {}",config.target,config.port,err);
+            eprintln!("Failed to capture a stray stream at {}:{}: {}",config.target,config.port,err);
+          },
+        }
       },
     }
   }

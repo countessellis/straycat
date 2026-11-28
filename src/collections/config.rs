@@ -12,9 +12,10 @@ use super::util;
 
 #[derive(Debug, Clone)]
 pub struct Configurator {
-  pub defaults: HashMap<String,String>,
-  pub file:     Option<(String,String)>,
-  pub ignore:   Vec<String>,
+  pub defaults:  HashMap<String,String>,
+  pub file:      Option<(String,String)>,
+  pub ignore:    Vec<String>,
+  pub arguments: Vec<String>,
   pub flags:     HashMap<String,ConfigFlag>,
 }
 
@@ -26,7 +27,8 @@ impl Configurator {
       config.from_file(&config_dir,&config_file);
     }
     log::debug!("Reading config from arguments.");
-    let mut args: Args = args();
+    let mut args = args().skip(1);
+    let mut raw: usize = 0;
     while let Some(arg) = args.next() {
       match arg.as_str() {
         option if self.ignore.contains(&option.to_string()) => {},
@@ -52,6 +54,7 @@ impl Configurator {
               }
             } else {
               if let Some(flag) = self.flags.get(&format!("-{}",option)) {
+                log::debug!("Flag: {:?}",flag);
                 if flag.arg {
                   match args.next() {
                     Some(value) => { config.set(&flag.key,&value.to_string()); },
@@ -66,7 +69,12 @@ impl Configurator {
             }
           }
         },
-        _ => {},
+        value => {
+          if raw < self.arguments.len() {
+            config.set(&self.arguments[raw],&value.to_string());
+            raw += 1;
+          }
+        },
       }
     }
     config
@@ -103,8 +111,10 @@ pub struct Config {
 
 impl fmt::Display for Config {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    let key_width: usize = self.config.keys().map(|k| k.len()).max().unwrap_or(0);
-    let config: String = self.config.iter().map(|(parameter,value)| { let key = format!("    {}:",parameter); format!("{:<width$} {}",key,value, width=key_width) }).collect::<Vec<String>>().join("\n");
+    let key_width: usize = self.config.keys().map(|k| k.len()).max().unwrap_or(0) + 5;
+    log::debug!("{}",key_width);
+    let mut config: Vec<String> = self.config.iter().map(|(parameter,value)| { let key = format!("    {}:",parameter); format!("{:<width$} {}",key,value, width=key_width) }).collect::<Vec<String>>();
+    config.sort();
     write!(f,
 "
   -----------------------------------
@@ -115,7 +125,7 @@ impl fmt::Display for Config {
 
   -----------------------------------
 ",
-      config,
+      config.join("\n"),
     )
   }
 }
