@@ -23,11 +23,16 @@ Usage: straycat [(OPTIONS)]
 
 Options:
 
-  -s <ADDR>                            Specify the source IP, in IPv4 or IPv6.
+  -C                                   Send CRLF as line-ending.
   -p <PORT>                            Specify the source port, 0-65536.
+  -s <ADDR>                            Specify the source IP, in IPv4 or IPv6.
+
   --mode <MODE>                        Mode to run in (default: batch, choices: batch, interactive, help)
-  --target <MODE>                      Target to connect to, either a URL or a hostname:port pair.
+  --target <MODE>                      Target to connect to, either a URL, a hostname, or a hostname:port pair.
+  --port <MODE>                        Target port to connect to.
+  --secure <true/false>                Use TLS to connect (default: false)
   --pretty <MODE>                      Enable pretty print of JSON coming from target (default: false)
+
   --verbose <true/false>               Enable or disable logging (default: false)
   --debug <true/false>                 Enable or disable debug level logging (default: false)
   --help | -h                          Display this help message
