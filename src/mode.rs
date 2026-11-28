@@ -7,6 +7,7 @@ pub(crate) enum Mode {
   Interactive,
   Batch,
   Help,
+  Version,
 }
 
 impl Default for Mode {
@@ -22,6 +23,7 @@ impl FromStr for Mode {
       "interactive" => Ok(Mode::Interactive),
       "batch"       => Ok(Mode::Batch),
       "help"        => Ok(Mode::Help),
+      "version"     => Ok(Mode::Version),
       _             => Ok(Default::default()),
     }
   }
@@ -33,6 +35,7 @@ impl fmt::Display for Mode {
       Mode::Interactive => write!(f,"interactive"),
       Mode::Batch       => write!(f,"batch"),
       Mode::Help        => write!(f,"help"),
+      Mode::Version     => write!(f,"version"),
     }
   }
 }
@@ -52,6 +55,7 @@ impl Mode {
         },
         "--interactive"  => return Mode::Interactive,
         "--help"|"-h" => return Mode::Help,
+        "--version"|"-V" => return Mode::Version,
         _ => {},
       }
     }

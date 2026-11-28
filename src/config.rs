@@ -19,6 +19,9 @@ pub(crate) fn init() -> Config {
     ignore: vec![
       "--interactive".to_string(),
       "--help".to_string(),
+      "-h".to_string(),
+      "--version".to_string(),
+      "-v".to_string(),
     ],
     arguments: vec![
       "target".to_string(),

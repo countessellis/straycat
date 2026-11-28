@@ -29,5 +29,8 @@ pub fn run() {
       let help: Help = Help::new(&config);
       println!("{}",help);
     },
+    Mode::Version => {
+      println!("{}",version());
+    },
   }
 }

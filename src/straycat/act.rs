@@ -1,5 +1,6 @@
 use super::StrayCat;
 
+use crate::help::Help;
 use crate::strayconfig::StrayConfig;
 use crate::straystream::StrayStream;
 use crate::straywebserver::StrayWebServer;
@@ -12,6 +13,10 @@ impl StrayCat {
     let config: StrayConfig = StrayConfig::from_config(&self.config);
     log::debug!("{}",config);
     match config.url.as_str() {
+      target if target.is_empty() => {
+        let help: Help = Help::new(&self.config);
+        println!("{}",help);
+      },
       target if target.starts_with("ws://")|target.starts_with("wss://") => {
         match StrayWebSocket::run(&config) {
           Ok(()) => {},
