@@ -28,9 +28,13 @@ pub(crate) fn init() -> Config {
       "port".to_string(),
     ],
     flags: HashMap::from([
+      ("-4".to_string(),ConfigFlag::new("stray_ip_version",false,Some("4"))),
+      ("-6".to_string(),ConfigFlag::new("stray_ip_version",false,Some("6"))),
       ("-C".to_string(),ConfigFlag::new("crlf",false,Some("true"))),
+      ("-l".to_string(),ConfigFlag::new("stray_listen",false,Some("true"))),
       ("-p".to_string(),ConfigFlag::new("source_port",true,None)),
       ("-s".to_string(),ConfigFlag::new("source_addr",true,None)),
+      ("-U".to_string(),ConfigFlag::new("stray_unix_socket",true,None)),
       ("-v".to_string(),ConfigFlag::new("stray_verbose",false,Some("true"))),
     ]),
   };

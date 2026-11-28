@@ -17,9 +17,14 @@ pub(crate) struct Help {
 impl fmt::Display for Help {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     let details: Vec<String> = vec![
+      format!("  -4                                   Use IPv4 addresses only."),
+      format!("  -6                                   Use IPv6 addresses only."),
       format!("  -C                                   Send CRLF as line-ending."),
+      format!("  -l                                   Listen for an incoming connection rather than initiating a connection to a remote host."),
       format!("  -p <PORT>                            Specify the source port, 0-65536."),
       format!("  -s <ADDR>                            Specify the source IP, in IPv4 or IPv6."),
+      format!("  -U <PATH>                            Specify a UNIX socket file instead of a network connection."),
+      format!("  -v                                   Output verbose output for connection."),
       format!(""),
       format!("  --mode <MODE>                        Mode to run in (default: {}, choices: {})",DEFAULT_MODE,MODE_LIST.join(", ")),
       format!("  --target <MODE>                      Target to connect to, either a URL, a hostname, or a hostname:port pair."),
@@ -29,8 +34,8 @@ impl fmt::Display for Help {
       format!(""),
       format!("  --verbose <true/false>               Enable or disable logging (default: {})",DEFAULT_LOG_VERBOSE),
       format!("  --debug <true/false>                 Enable or disable debug level logging (default: {})",DEFAULT_LOG_DEBUG),
-      format!("  --help | -h                          Display this help message"),
-      format!("  --version | -V                       Display version"),
+      format!("  --help | -h                          Display this help message."),
+      format!("  --version | -V                       Display version."),
     ];
     let fields: Fields = Fields::new(&HashMap::from([
       ("RUNAS",self.config.get("ranas")),

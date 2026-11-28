@@ -23,9 +23,14 @@ Usage: straycat [(OPTIONS)]
 
 Options:
 
+  -4                                   Use IPv4 addresses only.
+  -6                                   Use IPv6 addresses only.
   -C                                   Send CRLF as line-ending.
+  -l                                   Listen for an incoming connection rather than initiating a connection to a remote host.
   -p <PORT>                            Specify the source port, 0-65536.
   -s <ADDR>                            Specify the source IP, in IPv4 or IPv6.
+  -U <PATH>                            Specify a UNIX socket file instead of a network connection.
+  -v                                   Output verbose output for connection.
 
   --mode <MODE>                        Mode to run in (default: batch, choices: batch, interactive, help)
   --target <MODE>                      Target to connect to, either a URL, a hostname, or a hostname:port pair.
@@ -35,8 +40,8 @@ Options:
 
   --verbose <true/false>               Enable or disable logging (default: false)
   --debug <true/false>                 Enable or disable debug level logging (default: false)
-  --help | -h                          Display this help message
-  --version | -V                       Display version
+  --help | -h                          Display this help message.
+  --version | -V                       Display version.
 ```
 
 ---

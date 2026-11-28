@@ -10,16 +10,19 @@ use crate::defaults::*;
 ///////////// StrayWebSocketConfig
 
 pub struct StrayConfig {
-  pub target:  String,
-  pub url:     String,
-  pub port:    u16,
-  pub source:  Option<String>,
-  pub headers: Vec<(String, String)>,
-  pub binary:  bool,
-  pub crlf:    bool,
-  pub verbose: bool,
-  pub pretty:  bool,
-  pub secure:  bool,
+  pub target:     String,
+  pub url:        String,
+  pub port:       u16,
+  pub ip_version: u8,
+  pub source:     Option<String>,
+  pub unix:       Option<String>,
+  pub secure:     bool,
+  pub listen:     bool,
+  pub headers:    Vec<(String, String)>,
+  pub binary:     bool,
+  pub crlf:       bool,
+  pub verbose:    bool,
+  pub pretty:     bool,
 }
 
 impl fmt::Display for StrayConfig {
@@ -32,15 +35,18 @@ impl fmt::Display for StrayConfig {
             Stray Config 
   -----------------------------------
 
-    Target:  {}
-    URL:     {}
-    Port:    {}
-    Source:  {}
-    Binary:  {}
-    CRLF:    {}
-    Verbose: {}
-    Pretty:  {}
-    Secure:  {}
+    Target:     {}
+    URL:        {}
+    Port:       {}
+    IP Version: {}
+    Source:     {}
+    Unix:       {}
+    Secure:     {}
+    Listen:     {}
+    Binary:     {}
+    CRLF:       {}
+    Verbose:    {}
+    Pretty:     {}
 
     Headers:
 
@@ -52,12 +58,15 @@ impl fmt::Display for StrayConfig {
   self.target,
   self.url,
   self.port,
+  self.ip_version,
   match self.source { Some(ref source) => source.as_str(), None => "Default" },
+  match self.unix   { Some(ref unix)   => unix.as_str(),   None => "Default" },
+  self.secure,
+  self.listen,
   self.binary,
   self.crlf,
   self.verbose,
   self.pretty,
-  self.secure,
   headers,
 )
   }
@@ -97,6 +106,10 @@ impl StrayConfig {
           },
         }
       },
+      ip_version: {
+        let ip_version: String = config.get("stray_ip_version");
+        ip_version.to_lowercase().parse::<u8>().unwrap_or(DEFAULT_STRAY_IP_VERSION)
+      },
       source: {
         let mut addr: String = config.get("source_addr");
         let port: String = config.get("source_port");
@@ -107,6 +120,31 @@ impl StrayConfig {
           (false,true) => Some(format!("{}:0",addr)),
           _            => None,
         }
+      },
+      unix: {
+        let unix: String = config.get("stray_unix_socket");
+        if !unix.is_empty() {
+          Some(unix)
+        } else {
+          let target: String = config.get("target");
+          if target.starts_with("unix://") { Some(target) } else { None }
+        }
+      },
+      secure: {
+        let secure = Some(config.get("tls")).filter(|tls| !tls.is_empty())
+          .or_else(|| Some(config.get("secure")).filter(|secure| !secure.is_empty()))
+          .map(|secure| secure.to_lowercase().parse::<bool>().unwrap_or(DEFAULT_STRAY_SECURE)).unwrap_or(false);
+        match config.get("target").as_str() {
+          target if target.starts_with("http://")|target.starts_with("ws://") => false,
+          target if target.starts_with("https://")|target.starts_with("wss://") => true,
+          _ => {
+            secure
+          },
+        }
+      },
+      listen: {
+        let listen: String = config.get("stray_listen");
+        listen.to_lowercase().parse::<bool>().unwrap_or(DEFAULT_STRAY_LISTEN)
       },
       headers: Vec::new(),
       binary: false,
@@ -121,18 +159,6 @@ impl StrayConfig {
       pretty: {
         let verbose: String = config.get("pretty");
         verbose.to_lowercase().parse::<bool>().unwrap_or(DEFAULT_STRAY_PRETTY)
-      },
-      secure: {
-        let secure = Some(config.get("tls")).filter(|tls| !tls.is_empty())
-          .or_else(|| Some(config.get("secure")).filter(|secure| !secure.is_empty()))
-          .map(|secure| secure.to_lowercase().parse::<bool>().unwrap_or(DEFAULT_STRAY_SECURE)).unwrap_or(false);
-        match config.get("target").as_str() {
-          target if target.starts_with("http://")|target.starts_with("ws://") => false,
-          target if target.starts_with("https://")|target.starts_with("wss://") => true,
-          _ => {
-            secure
-          },
-        }
       },
     }
   }

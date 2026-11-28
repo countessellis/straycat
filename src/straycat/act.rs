@@ -12,6 +12,16 @@ impl StrayCat {
   pub fn act(&self) {
     let config: StrayConfig = StrayConfig::from_config(&self.config);
     log::debug!("{}",config);
+    if config.listen {
+      match StrayStream::run(&config) {
+        Ok(()) => {},
+        Err(err) => {
+          log::error!("Failed to listen for a stray stream: {}", err);
+          eprintln!("Failed to listen for a stray stream: {}", err);
+        },
+      }
+      return;
+    }
     match config.url.as_str() {
       target if target.is_empty() => {
         let help: Help = Help::new(&self.config);
@@ -32,6 +42,15 @@ impl StrayCat {
           Err(err) => {
             log::error!("Failed to capture a stray webserver at {}: {}",config.url,err);
             eprintln!("Failed to capture a stray webserver at {}: {}",config.url,err);
+          },
+        }
+      },
+      target if target.starts_with("unix://") || !target.contains("://") => {
+        match StrayStream::run(&config) {
+          Ok(()) => {},
+          Err(err) => {
+            log::error!("Failed to capture a stray stream at {}: {}", config.url, err);
+            eprintln!("Failed to capture a stray stream at {}: {}", config.url, err);
           },
         }
       },

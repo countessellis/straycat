@@ -3,22 +3,28 @@ use openssl::{
   ssl::{NameType,SslConnector,SslMethod,SslStream,SslVerifyMode},
   x509::{X509,X509VerifyResult},
 };
-use socket2::{Domain,Protocol,Socket,Type};
 use std::{
   fmt,
   io::{self,ErrorKind,Read,Write},
-  net::{SocketAddr,TcpStream,ToSocketAddrs},
+  net::{SocketAddr,TcpStream},
   thread,
   time::Duration,
 };
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 
-use crate::strayconfig::*;
+use crate::strayconfig::StrayConfig;
+use crate::straysocket::StraySocket;
 
 ///////////// StrayStream
 
 pub enum StrayStream {
   Tcp(TcpStream),
   Tls(SslStream<TcpStream>),
+  #[cfg(unix)]
+  Unix(UnixStream),
+  #[cfg(unix)]
+  UnixTls(SslStream<UnixStream>),
 }
 
 impl StrayStream {
@@ -26,6 +32,10 @@ impl StrayStream {
     match self {
       StrayStream::Tcp(stream) => stream.set_read_timeout(timeout),
       StrayStream::Tls(stream) => stream.get_ref().set_read_timeout(timeout),
+      #[cfg(unix)]
+      StrayStream::Unix(s) => s.set_read_timeout(timeout),
+      #[cfg(unix)]
+      StrayStream::UnixTls(s) => s.get_ref().set_read_timeout(timeout),
     }
   }
 }
@@ -35,6 +45,10 @@ impl Read for StrayStream {
     match self {
       StrayStream::Tcp(stream) => stream.read(buf),
       StrayStream::Tls(stream) => stream.read(buf),
+      #[cfg(unix)]
+      StrayStream::Unix(s) => s.read(buf),
+      #[cfg(unix)]
+      StrayStream::UnixTls(s) => s.read(buf),
     }
   }
 }
@@ -44,6 +58,10 @@ impl Write for StrayStream {
     match self {
       StrayStream::Tcp(stream) => stream.write(buf),
       StrayStream::Tls(stream) => stream.write(buf),
+      #[cfg(unix)]
+      StrayStream::Unix(s) => s.write(buf),
+      #[cfg(unix)]
+      StrayStream::UnixTls(s) => s.write(buf),
     }
   }
 
@@ -51,29 +69,36 @@ impl Write for StrayStream {
     match self {
       StrayStream::Tcp(stream) => stream.flush(),
       StrayStream::Tls(stream) => stream.flush(),
+      #[cfg(unix)]
+      StrayStream::Unix(s) => s.flush(),
+      #[cfg(unix)]
+      StrayStream::UnixTls(s) => s.flush(),
     }
   }
 }
 
 impl fmt::Display for StrayStream {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let local = self.local_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".into());
-    let peer = self.peer_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".into());
     match self {
-      StrayStream::Tcp(_) => write!(f, "TCP ({local} -> {peer})"),
-      StrayStream::Tls(s) => {
-        let ssl = s.ssl();
-        let version = ssl.version_str();
-        let cipher = ssl.current_cipher().map(|c| c.name()).unwrap_or("unknown");
-        write!(f, "TLS ({local} -> {peer}) [{version}, {cipher}")?;
-        if let Some(sni) = ssl.servername(NameType::HOST_NAME) {
-          write!(f, ", sni={sni}")?;
+      StrayStream::Tcp(_) | StrayStream::Tls(_) => {
+        let local = self.local_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".into());
+        let peer = self.peer_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".into());
+        match self {
+          StrayStream::Tcp(_) => write!(f, "TCP ({local} -> {peer})"),
+          StrayStream::Tls(s) => Self::fmt_tls(f,&format!("TLS ({local} -> {peer})"), s.ssl()),
+          _ => unreachable!(),
         }
-        if let Some(alpn) = ssl.selected_alpn_protocol() {
-          write!(f, ", alpn={}", String::from_utf8_lossy(alpn))?;
-        }
-        write!(f, "]")
-      }
+      },
+      #[cfg(unix)]
+      StrayStream::Unix(s) => {
+        let peer = s.peer_addr().ok().and_then(|a| a.as_pathname().map(|p| p.display().to_string())).unwrap_or_else(|| "unnamed".into());
+        write!(f, "UNIX ({peer})")
+      },
+      #[cfg(unix)]
+      StrayStream::UnixTls(s) => {
+        let peer = s.get_ref().peer_addr().ok().and_then(|a| a.as_pathname().map(|p| p.display().to_string())) .unwrap_or_else(|| "unnamed".into());
+        Self::fmt_tls(f, &format!("UNIX+TLS ({peer})"),s.ssl())
+      },
     }
   }
 }
@@ -81,18 +106,22 @@ impl fmt::Display for StrayStream {
 impl StrayStream {
   pub fn connect(cfg: &StrayConfig) -> Result<StrayStream,Box<dyn std::error::Error>> {
     log::info!("Capturing a stray stream at {}.",cfg.target);
-    let tcp_stream = if let Some(ref source) = cfg.source {
-      let local_addr: SocketAddr = source.parse()?;
-      let remote_addr = (cfg.target.clone(),cfg.port).to_socket_addrs()?.find(|addr| addr.is_ipv4() == local_addr.is_ipv4()).ok_or("No matching IPv4/IPv6 remote address found for source address")?;
-      let domain = Domain::for_address(local_addr);
-      let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))?;
-      socket.set_reuse_address(true)?;
-      socket.bind(&local_addr.into())?;
-      socket.connect(&remote_addr.into())?;
-      socket.into()
-    } else {
-      TcpStream::connect((cfg.target.clone(),cfg.port))?
-    };
+    #[cfg(unix)]
+    if let Some(ref path) = cfg.unix {
+      let path = path.strip_prefix("unix://").unwrap_or(&path);
+      let unix_stream: UnixStream = StraySocket::connect_unix(path)?.try_into()?;
+      return if cfg.secure {
+        let mut builder = SslConnector::builder(SslMethod::tls())?;
+        builder.set_verify(SslVerifyMode::NONE);
+        let connector = builder.build();
+        let mut ssl_config = connector.configure()?;
+        ssl_config.set_verify_hostname(false);
+        Ok(StrayStream::UnixTls(ssl_config.connect("localhost", unix_stream)?))
+      } else {
+        Ok(StrayStream::Unix(unix_stream))
+      };
+    }
+    let tcp_stream: TcpStream = StraySocket::connect_tcp(cfg)?.try_into()?;
     if cfg.secure {
       let mut builder = SslConnector::builder(SslMethod::tls())?;
       builder.set_verify(SslVerifyMode::NONE);
@@ -105,8 +134,23 @@ impl StrayStream {
     }
   }
 
+  pub fn listen(cfg: &StrayConfig) -> Result<StrayStream, Box<dyn std::error::Error>> {
+    #[cfg(unix)]
+    if let Some(ref unix_path) = cfg.unix {
+      let path = unix_path.strip_prefix("unix://").unwrap_or(unix_path);
+      let unix_stream: UnixStream = StraySocket::listen_unix(path, cfg.verbose)?.try_into()?;
+      return Ok(StrayStream::Unix(unix_stream));
+    }
+    let tcp_stream: TcpStream = StraySocket::listen_tcp(cfg)?.try_into()?;
+    Ok(StrayStream::Tcp(tcp_stream))
+  }
+
   pub(crate) fn run(cfg: &StrayConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let mut stream = Self::connect(cfg)?;
+    let mut stream = if cfg.listen {
+      Self::listen(cfg)?
+    } else {
+      Self::connect(cfg)?
+    };
     log::info!("Connected: {}",stream);
     if cfg.verbose {
       eprintln!("Connected: {}",stream);
@@ -167,15 +211,19 @@ impl StrayStream {
 
   pub fn get_cert(&self) -> Option<X509> {
     match self {
-      StrayStream::Tcp(_) => None,
       StrayStream::Tls(stream) => stream.ssl().peer_certificate(),
+      #[cfg(unix)]
+      StrayStream::UnixTls(s) => s.ssl().peer_certificate(),
+      _ => None,
     }
   }
 
   pub fn verify_cert(&self) -> Option<X509VerifyResult> {
     match self {
-      StrayStream::Tcp(_) => None,
       StrayStream::Tls(s) => Some(s.ssl().verify_result()),
+      #[cfg(unix)]
+      StrayStream::UnixTls(s) => Some(s.ssl().verify_result()),
+      _ => None,
     }
   }
 
@@ -200,26 +248,66 @@ impl StrayStream {
     if let Some(verify) = self.verify_cert() { eprintln!("*  SSL certificate verify result: {verify}"); }
   }
 
-  pub fn tcp_ref(&self) -> &TcpStream {
+  pub fn tcp_ref(&self) -> Option<&TcpStream> {
     match self {
-      StrayStream::Tcp(stream) => stream,
-      StrayStream::Tls(stream) => stream.get_ref(),
+      StrayStream::Tcp(stream) => Some(stream),
+      StrayStream::Tls(stream) => Some(stream.get_ref()),
+      #[cfg(unix)]
+      StrayStream::Unix(_) | StrayStream::UnixTls(_) => None,
     }
   }
 
   pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-    self.tcp_ref().peer_addr()
+    match self {
+      StrayStream::Tcp(stream) => stream.peer_addr(),
+      StrayStream::Tls(stream) => stream.get_ref().peer_addr(),
+      #[cfg(unix)]
+      StrayStream::Unix(_) | StrayStream::UnixTls(_) => {
+        Err(io::Error::new(io::ErrorKind::AddrNotAvailable, "Unix domain socket has no IP SocketAddr"))
+      }
+    }
   }
 
   pub fn local_addr(&self) -> io::Result<SocketAddr> {
-    self.tcp_ref().local_addr()
+    match self {
+      StrayStream::Tcp(stream) => stream.local_addr(),
+      StrayStream::Tls(stream) => stream.get_ref().local_addr(),
+      #[cfg(unix)]
+      StrayStream::Unix(_) | StrayStream::UnixTls(_) => {
+        Err(io::Error::new(io::ErrorKind::AddrNotAvailable, "Unix domain socket has no IP SocketAddr"))
+      }
+    }
   }
 
   pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-    self.tcp_ref().set_nodelay(nodelay)
+    match self {
+      StrayStream::Tcp(s) => s.set_nodelay(nodelay),
+      StrayStream::Tls(s) => s.get_ref().set_nodelay(nodelay),
+      // TCP_NODELAY does not apply to Unix domain sockets
+      #[cfg(unix)]
+      StrayStream::Unix(_) | StrayStream::UnixTls(_) => Ok(()),
+    }
   }
 
   pub fn is_tls(&self) -> bool {
-    matches!(self,StrayStream::Tls(_))
+    match self {
+      StrayStream::Tls(_) => true,
+      #[cfg(unix)]
+      StrayStream::UnixTls(_) => true,
+      _ => false,
+    }
+  }
+
+  fn fmt_tls(f: &mut fmt::Formatter<'_>, prefix: &str, ssl: &openssl::ssl::SslRef) -> fmt::Result {
+    let version = ssl.version_str();
+    let cipher = ssl.current_cipher().map(|c| c.name()).unwrap_or("unknown");
+    write!(f, "{prefix} [{version}, {cipher}")?;
+    if let Some(sni) = ssl.servername(NameType::HOST_NAME) {
+      write!(f, ", sni={sni}")?;
+    }
+    if let Some(alpn) = ssl.selected_alpn_protocol() {
+      write!(f, ", alpn={}", String::from_utf8_lossy(alpn))?;
+    }
+    write!(f, "]")
   }
 }

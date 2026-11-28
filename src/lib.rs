@@ -4,6 +4,7 @@ pub mod logger;
 pub mod collections;
 pub mod straycat;
 pub mod strayconfig;
+pub mod straysocket;
 pub mod straystream;
 pub mod straywebserver;
 pub mod straywebsocket;
@@ -18,6 +19,7 @@ pub(crate) mod version;
 
 pub use straycat::StrayCat;
 pub use strayconfig::StrayConfig;
+pub use straysocket::StraySocket;
 pub use straystream::StrayStream;
 pub use straywebserver::StrayWebServer;
 pub use straywebsocket::StrayWebSocket;
