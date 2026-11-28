@@ -45,8 +45,8 @@ impl Configurator {
             if option.len() > 1 {
               for flag in option.chars() {
                 if let Some(flag) = self.flags.get(&format!("-{}",flag)) && flag.arg {
-                  if let Some(ref default) = flag.default {
-                    config.set(&flag.key,&default);
+                  if let Some(ref value) = flag.value {
+                    config.set(&flag.key,&value);
                   } else {
                     config.set(&flag.key,&"true".to_string());
                   }
@@ -60,8 +60,8 @@ impl Configurator {
                     Some(value) => { config.set(&flag.key,&value.to_string()); },
                     None => {},
                   }
-                } else if let Some(ref default) = flag.default {
-                  config.set(&flag.key,&default);
+                } else if let Some(ref value) = flag.value {
+                  config.set(&flag.key,&value);
                 } else {
                   config.set(&flag.key,&"true".to_string());
                 }
@@ -87,17 +87,17 @@ impl Configurator {
 
 #[derive(Debug, Clone)]
 pub struct ConfigFlag {
-  pub key:     String,
-  pub arg:     bool,
-  pub default: Option<String>,
+  pub key:   String,
+  pub arg:   bool,
+  pub value: Option<String>,
 }
 
 impl ConfigFlag {
-  pub fn new(key: &str, arg: bool, default: Option<&str>) -> Self {
+  pub fn new(key: &str, arg: bool, value: Option<&str>) -> Self {
     Self {
       key:  key.to_string(),
       arg:  arg,
-      default: match default { Some(default) => Some(default.to_string()), None => None },
+      value: match value { Some(value) => Some(value.to_string()), None => None },
     }
   }
 }

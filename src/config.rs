@@ -21,7 +21,7 @@ pub(crate) fn init() -> Config {
       "--help".to_string(),
       "-h".to_string(),
       "--version".to_string(),
-      "-v".to_string(),
+      "-V".to_string(),
     ],
     arguments: vec![
       "target".to_string(),

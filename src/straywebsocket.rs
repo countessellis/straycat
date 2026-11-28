@@ -34,6 +34,7 @@ impl StrayWebSocket {
     log::info!("Connected: {}",stream);
     if cfg.verbose {
       eprintln!("Connected: {}",stream);
+      stream.print_cert();
     }
     let (ws,response) = client(request,stream)?;
     if cfg.verbose {

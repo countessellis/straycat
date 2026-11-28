@@ -110,6 +110,7 @@ impl StrayStream {
     log::info!("Connected: {}",stream);
     if cfg.verbose {
       eprintln!("Connected: {}",stream);
+      stream.print_cert();
     }
     log::info!("Playing with a stray stream.");
     let _ = stream.set_nodelay(true);
@@ -176,6 +177,27 @@ impl StrayStream {
       StrayStream::Tcp(_) => None,
       StrayStream::Tls(s) => Some(s.ssl().verify_result()),
     }
+  }
+
+  pub fn print_cert(&self) {
+    let Some(cert) = self.get_cert() else { return };
+    eprintln!("* Server certificate:");
+    let format_name = |name: &openssl::x509::X509NameRef| -> String {
+      name.entries().filter_map(|e| {
+        let key   = e.object().nid().short_name().ok()?;
+        let value = e.data().to_string().ok()?;
+        Some(format!("{}={}",key,value))
+      }).collect::<Vec<_>>().join(", ")
+    };
+    eprintln!("*  subject: {}", format_name(cert.subject_name()));
+    eprintln!("*  start date: {}", cert.not_before());
+    eprintln!("*  expire date: {}", cert.not_after());
+    if let Some(sans) = cert.subject_alt_names() {
+      let names: Vec<String> = sans.iter().filter_map(|g| { g.dnsname().map(|dns| format!("DNS:{}",dns)).or_else(|| g.ipaddress().map(|ip| format!("IP:{ip:?}"))) }).collect();
+      if !names.is_empty() { eprintln!("*  subjectAltName: {}", names.join(", ")); }
+    }
+    eprintln!("*  issuer: {}", format_name(cert.issuer_name()));
+    if let Some(verify) = self.verify_cert() { eprintln!("*  SSL certificate verify result: {verify}"); }
   }
 
   pub fn tcp_ref(&self) -> &TcpStream {

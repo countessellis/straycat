@@ -29,6 +29,7 @@ impl StrayWebServer {
     log::info!("Connected: {stream}");
     if cfg.verbose {
       eprintln!("Connected: {stream}");
+      stream.print_cert();
     }
     let mut req = format!("{method} {path} HTTP/1.1\r\n");
     let has_host = cfg.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("host"));
